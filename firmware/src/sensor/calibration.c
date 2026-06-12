@@ -9,15 +9,13 @@
 #include "calibration.h"
 #include "config/device_config.h"
 #include "../storage/flash_storage.h"
+#include "system/crc_utils.h"
 #include <string.h>
 #include <math.h>
 
 /* Module state */
 static calibration_params_t s_cal_params;
 static bool s_initialized = false;
-
-/* CRC-32 lookup table (IEEE 802.3) */
-static uint32_t crc32_calculate(const void *data, size_t len);
 
 cgm_error_t calibration_init(void)
 {
@@ -187,23 +185,3 @@ cgm_error_t calibration_set_factory(float sensitivity, float offset,
     return calibration_save();
 }
 
-/* --- CRC-32 implementation --- */
-
-static uint32_t crc32_calculate(const void *data, size_t len)
-{
-    const uint8_t *bytes = (const uint8_t *)data;
-    uint32_t crc = 0xFFFFFFFF;
-
-    for (size_t i = 0; i < len; i++) {
-        crc ^= bytes[i];
-        for (int j = 0; j < 8; j++) {
-            if (crc & 1) {
-                crc = (crc >> 1) ^ 0xEDB88320;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-
-    return crc ^ 0xFFFFFFFF;
-}

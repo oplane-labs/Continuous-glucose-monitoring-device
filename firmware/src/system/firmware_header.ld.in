@@ -1,0 +1,4 @@
+SECTION_PROLOGUE(.firmware_header,,)
+{
+    KEEP(*(.firmware_header))
+} GROUP_LINK_IN(ROM_REGION)

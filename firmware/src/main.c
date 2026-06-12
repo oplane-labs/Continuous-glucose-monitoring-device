@@ -21,6 +21,7 @@
 #include "config/device_config.h"
 #include "config/error_codes.h"
 #include "cgm_types.h"
+#include "system/post.h"
 
 #ifndef UNIT_TEST
 #include <zephyr/kernel.h>
@@ -249,8 +250,10 @@ static void measurement_cycle(void)
  */
 static cgm_error_t run_power_on_self_test(void)
 {
-    /* Test 1: RAM integrity - walking ones pattern */
+    cgm_error_t err;
     volatile uint32_t test_word;
+
+    /* Test 1: RAM integrity - walking ones pattern */
     for (int i = 0; i < 32; i++) {
         test_word = (1UL << i);
         if (test_word != (1UL << i)) {
@@ -258,9 +261,11 @@ static cgm_error_t run_power_on_self_test(void)
         }
     }
 
-    /* Test 2: Flash CRC verification */
-    /* In production, this verifies the CRC stored in the firmware image header
-     * against a computed CRC of the firmware .text and .rodata sections. */
+    /* Test 2: Flash CRC verification (OPLANE_REQ-00092310) */
+    err = post_flash_crc_check();
+    if (err != CGM_OK) {
+        return err;
+    }
 
     /* Test 3: ADC reference voltage check */
     /* Read the internal reference voltage and verify it is within ±5%
@@ -271,7 +276,7 @@ static cgm_error_t run_power_on_self_test(void)
     /* Test 5: Sensor impedance check */
     sensor_init();
     uint32_t impedance;
-    cgm_error_t err = sensor_check_impedance(&impedance);
+    err = sensor_check_impedance(&impedance);
     if (err != CGM_OK) {
         return CGM_ERR_POST_SENSOR;
     }

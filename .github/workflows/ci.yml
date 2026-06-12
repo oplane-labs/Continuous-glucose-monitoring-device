@@ -17,7 +17,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyserial
+          pip install pyserial pyelftools intelhex
           apt-get update && apt-get install -y cmake gcc g++
 
       - name: Build unit tests
