@@ -188,6 +188,80 @@ void test_signal_loss_alert(void)
 }
 
 /**
+ * @test SWR-VER-035: Predicted low alert fires when projection crosses
+ * threshold while glucose is still in-range.
+ *
+ * 100 mg/dL falling at -2 mg/dL/min projects to 60 mg/dL in 20 min,
+ * which is below the default 70 mg/dL predicted-low threshold.
+ */
+void test_predicted_low_alert_fires(void)
+{
+    alert_evaluate(100, -2.0f, FAULT_NONE);
+    TEST_ASSERT_TRUE(alert_is_active(ALERT_PREDICTED_LOW));
+    /* Real low not active yet — predicted is the highest priority. */
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_LOW_GLUCOSE));
+}
+
+/**
+ * @test SWR-VER-035: Stable glucose (no fall) must not fire predicted-low
+ * even if the absolute level is moderate.
+ */
+void test_predicted_low_no_fire_when_stable(void)
+{
+    alert_evaluate(75, 0.0f, FAULT_NONE);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
+}
+
+/**
+ * @test SWR-VER-035: Rising glucose must not fire predicted-low.
+ */
+void test_predicted_low_no_fire_when_rising(void)
+{
+    alert_evaluate(80, +2.0f, FAULT_NONE);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
+}
+
+/**
+ * @test SWR-VER-035: Predicted-low is suppressed when LOW_GLUCOSE is
+ * already active (no double-firing).
+ */
+void test_predicted_low_suppressed_by_low_glucose(void)
+{
+    /* Drive LOW_GLUCOSE active (2 consecutive < 55). */
+    alert_evaluate(50, -2.0f, FAULT_NONE);
+    alert_evaluate(48, -2.0f, FAULT_NONE);
+    TEST_ASSERT_TRUE(alert_is_active(ALERT_LOW_GLUCOSE));
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
+}
+
+/**
+ * @test SWR-VER-035: Hysteresis — alert clears only after projection
+ * recovers above threshold + 10 mg/dL.
+ */
+void test_predicted_low_hysteresis(void)
+{
+    /* Fire it. */
+    alert_evaluate(100, -2.0f, FAULT_NONE);
+    TEST_ASSERT_TRUE(alert_is_active(ALERT_PREDICTED_LOW));
+
+    /* Projection = 110 + 0*20 = 110, well above 70+10=80 — clears. */
+    alert_evaluate(110, 0.0f, FAULT_NONE);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
+}
+
+/**
+ * @test SWR-VER-035: Predicted-low ranks above HIGH_GLUCOSE / RAPID_RISE
+ * but below LOW_GLUCOSE and SENSOR_FAULT in priority ordering.
+ */
+void test_predicted_low_priority(void)
+{
+    alert_evaluate(100, -2.0f, FAULT_NONE);
+    alert_type_t highest;
+    TEST_ASSERT_EQUAL(CGM_OK, alert_get_highest_priority(&highest));
+    TEST_ASSERT_EQUAL(ALERT_PREDICTED_LOW, highest);
+}
+
+/**
  * @test No active alerts returns appropriate error
  */
 void test_no_active_alerts(void)
@@ -211,6 +285,12 @@ int main(void)
     RUN_TEST(test_critical_alert_not_snoozable);
     RUN_TEST(test_critical_low_not_snoozable);
     RUN_TEST(test_signal_loss_alert);
+    RUN_TEST(test_predicted_low_alert_fires);
+    RUN_TEST(test_predicted_low_no_fire_when_stable);
+    RUN_TEST(test_predicted_low_no_fire_when_rising);
+    RUN_TEST(test_predicted_low_suppressed_by_low_glucose);
+    RUN_TEST(test_predicted_low_hysteresis);
+    RUN_TEST(test_predicted_low_priority);
     RUN_TEST(test_no_active_alerts);
 
     return UNITY_END();

@@ -52,6 +52,12 @@
 #define CONFIG_CRITICAL_LOW_MGDL        45      /* Non-snoozable threshold */
 #define CONFIG_SIGNAL_LOSS_TIMEOUT_MS   1200000 /* 20 minutes */
 
+/* Predictive low alert (SWR-035) */
+#define CONFIG_PREDICTED_LOW_DEFAULT    70      /* mg/dL projected threshold */
+#define CONFIG_PREDICTION_HORIZON_MIN   20      /* Minutes ahead to project */
+#define CONFIG_PREDICTION_MIN_FALL_RATE (-1.0f) /* Min |rate| to trust forecast */
+#define CONFIG_PREDICTED_LOW_CLEAR_HYST 10      /* mg/dL hysteresis above thresh */
+
 /* --- BLE configuration --- */
 #define CONFIG_BLE_DEVICE_NAME          "GlucoSense CGM"
 #define CONFIG_BLE_ADV_INTERVAL_FAST_MS 1000
