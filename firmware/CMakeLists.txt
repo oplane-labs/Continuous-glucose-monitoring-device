@@ -23,6 +23,9 @@ add_compile_options(
 # Source files
 set(FIRMWARE_SOURCES
     src/main.c
+    src/system/crc_utils.c
+    src/system/post.c
+    src/system/firmware_header_def.c
     src/sensor/glucose_sensor.c
     src/sensor/calibration.c
     src/signal/signal_processing.c
@@ -45,8 +48,22 @@ set(FIRMWARE_INCLUDES
 if(NOT BUILD_TESTS)
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
+    zephyr_linker_sources(ROM_START SORT_KEY 00firmware_header
+        src/system/firmware_header.ld.in)
+
     target_sources(app PRIVATE ${FIRMWARE_SOURCES})
     target_include_directories(app PRIVATE ${FIRMWARE_INCLUDES})
+
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_custom_command(
+        TARGET app POST_BUILD
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/../tools/crc_stamp.py
+            --elf ${CMAKE_BINARY_DIR}/zephyr/zephyr.elf
+            --hex ${CMAKE_BINARY_DIR}/zephyr/zephyr.hex
+        COMMENT "Stamping firmware CRC into image header"
+        VERBATIM
+    )
 
     # Zephyr Kconfig options
     # CONFIG_BT=y
@@ -91,4 +108,8 @@ else()
     add_executable(test_alert_manager tests/test_alert_manager.c)
     target_link_libraries(test_alert_manager firmware_lib unity)
     add_test(NAME test_alert_manager COMMAND test_alert_manager)
+
+    add_executable(test_post tests/test_post.c)
+    target_link_libraries(test_post firmware_lib unity)
+    add_test(NAME test_post COMMAND test_post)
 endif()
