@@ -58,14 +58,6 @@
 #define CONFIG_PREDICTION_MIN_FALL_RATE (-1.0f) /* Min |rate| to trust forecast */
 #define CONFIG_PREDICTED_LOW_CLEAR_HYST 10      /* mg/dL hysteresis above thresh */
 
-/* Physiological plausibility bounds for prediction inputs (SWR-035, RC-007).
- * Inputs outside these ranges are treated as untrusted and the prediction
- * path is skipped. Values are clinically generous on purpose — the goal is
- * to reject corrupt/spurious data, not to second-guess the signal pipeline. */
-#define CONFIG_PREDICTION_RATE_MAX_ABS  10.0f   /* mg/dL/min — max |rate| trusted */
-#define CONFIG_PREDICTION_GLUCOSE_MIN   40      /* mg/dL — matches GLUCOSE_MIN_MGDL */
-#define CONFIG_PREDICTION_GLUCOSE_MAX   400     /* mg/dL — matches GLUCOSE_MAX_MGDL */
-
 /* --- BLE configuration --- */
 #define CONFIG_BLE_DEVICE_NAME          "GlucoSense CGM"
 #define CONFIG_BLE_ADV_INTERVAL_FAST_MS 1000

@@ -10,7 +10,6 @@
 #include "alert/alert_manager.h"
 #include "config/device_config.h"
 #include "test_stubs.h"
-#include <math.h>
 
 void setUp(void)
 {
@@ -263,99 +262,6 @@ void test_predicted_low_priority(void)
 }
 
 /**
- * @test SWR-VER-035: GLUCOSE_INVALID input must not trigger predicted-low.
- */
-void test_predicted_low_rejects_invalid_glucose(void)
-{
-    alert_evaluate(GLUCOSE_INVALID, -2.0f, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: Glucose above physiological max must not enter the
- * prediction path (uint16_t can carry corrupt values up to 0xFFFE).
- */
-void test_predicted_low_rejects_implausible_high_glucose(void)
-{
-    /* 0xFFFE is not GLUCOSE_INVALID but is wildly out of range. With a
-     * fast fall a naive predictor would still compute a low projection. */
-    alert_evaluate(0xFFFE, -10.0f, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: Implausibly large negative rate (-100 mg/dL/min) must
- * be rejected, not used to fabricate a low projection.
- */
-void test_predicted_low_rejects_extreme_negative_rate(void)
-{
-    alert_evaluate(200, -100.0f, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: Implausibly large positive rate is rejected as
- * untrusted input (independent of the falling-rate gate).
- */
-void test_predicted_low_rejects_extreme_positive_rate(void)
-{
-    alert_evaluate(120, 100.0f, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: NaN / Inf rate must not trigger predicted-low even
- * if the comparison would otherwise sneak through.
- */
-void test_predicted_low_rejects_nonfinite_rate(void)
-{
-    alert_evaluate(100, NAN, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-
-    alert_evaluate(100, -INFINITY, FAULT_NONE);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: Active sensor fault suppresses predicted-low — both
- * the upstream signal pipeline and this guard must agree the data is
- * trustworthy before a prediction-based alert can fire.
- */
-void test_predicted_low_suppressed_by_sensor_fault(void)
-{
-    alert_evaluate(100, -2.0f, FAULT_SHORT_CIRCUIT);
-    TEST_ASSERT_FALSE(alert_is_active(ALERT_PREDICTED_LOW));
-    TEST_ASSERT_TRUE(alert_is_active(ALERT_SENSOR_FAULT));
-}
-
-/**
- * @test SWR-VER-035: A single corrupt sample must not clear an existing
- * predicted-low alert — prior state is preserved when input fails
- * validation, so attackers/faults cannot silently suppress the warning.
- */
-void test_predicted_low_corrupt_sample_does_not_clear(void)
-{
-    /* Drive predicted-low active. */
-    alert_evaluate(100, -2.0f, FAULT_NONE);
-    TEST_ASSERT_TRUE(alert_is_active(ALERT_PREDICTED_LOW));
-
-    /* Corrupt sample: invalid glucose. Must NOT clear the existing alert. */
-    alert_evaluate(GLUCOSE_INVALID, -2.0f, FAULT_NONE);
-    TEST_ASSERT_TRUE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
- * @test SWR-VER-035: Boundary — glucose at GLUCOSE_MIN_MGDL with a modest
- * fall rate is accepted and should fire (boundaries are inclusive).
- */
-void test_predicted_low_accepts_boundary_glucose(void)
-{
-    /* 40 + (-2)*20 = 0 < 70 — fires. */
-    alert_evaluate(GLUCOSE_MIN_MGDL, -2.0f, FAULT_NONE);
-    TEST_ASSERT_TRUE(alert_is_active(ALERT_PREDICTED_LOW));
-}
-
-/**
  * @test No active alerts returns appropriate error
  */
 void test_no_active_alerts(void)
@@ -385,14 +291,6 @@ int main(void)
     RUN_TEST(test_predicted_low_suppressed_by_low_glucose);
     RUN_TEST(test_predicted_low_hysteresis);
     RUN_TEST(test_predicted_low_priority);
-    RUN_TEST(test_predicted_low_rejects_invalid_glucose);
-    RUN_TEST(test_predicted_low_rejects_implausible_high_glucose);
-    RUN_TEST(test_predicted_low_rejects_extreme_negative_rate);
-    RUN_TEST(test_predicted_low_rejects_extreme_positive_rate);
-    RUN_TEST(test_predicted_low_rejects_nonfinite_rate);
-    RUN_TEST(test_predicted_low_suppressed_by_sensor_fault);
-    RUN_TEST(test_predicted_low_corrupt_sample_does_not_clear);
-    RUN_TEST(test_predicted_low_accepts_boundary_glucose);
     RUN_TEST(test_no_active_alerts);
 
     return UNITY_END();

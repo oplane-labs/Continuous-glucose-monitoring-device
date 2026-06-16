@@ -8,7 +8,6 @@
 
 #include "alert_manager.h"
 #include "config/device_config.h"
-#include <math.h>
 #include <string.h>
 
 #ifndef UNIT_TEST
@@ -113,57 +112,35 @@ cgm_error_t alert_evaluate(uint16_t glucose_mgdl, float rate_mgdl_per_min,
 
     /* --- Predicted low alert (SWR-035) ---
      * Project current glucose forward by the configured horizon using the
-     * measured rate of change. Sensor input is untrusted and is validated
-     * against physiological plausibility bounds before use:
-     *   - glucose must not be GLUCOSE_INVALID,
-     *   - glucose must lie within [GLUCOSE_MIN_MGDL, GLUCOSE_MAX_MGDL],
-     *   - rate must be finite (no NaN / Inf propagating from upstream),
-     *   - |rate| must not exceed CONFIG_PREDICTION_RATE_MAX_ABS,
-     *   - sensor must not currently report a fault,
-     *   - LOW_GLUCOSE must not already be active (no double-firing).
-     * Inputs that fail validation skip the prediction path entirely; any
-     * existing PREDICTED_LOW remains in its prior state rather than being
-     * silently cleared by bad data. Fires when the projection (linear
-     * extrapolation of rate over horizon) falls below the configured
-     * threshold while glucose is trending down at >= 1 mg/dL/min. Cleared
-     * with hysteresis once the projection recovers above threshold +
-     * CONFIG_PREDICTED_LOW_CLEAR_HYST. */
-    if (s_alert.alerts[ALERT_LOW_GLUCOSE].active ||
-        sensor_fault != FAULT_NONE) {
-        /* Real low or sensor fault active — predicted-low is redundant or
-         * unsafe to compute. Suppress it. */
-        s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
-    } else {
-        bool inputs_valid =
-            (glucose_mgdl != GLUCOSE_INVALID) &&
-            (glucose_mgdl >= CONFIG_PREDICTION_GLUCOSE_MIN) &&
-            (glucose_mgdl <= CONFIG_PREDICTION_GLUCOSE_MAX) &&
-            isfinite(rate_mgdl_per_min) &&
-            (fabsf(rate_mgdl_per_min) <= CONFIG_PREDICTION_RATE_MAX_ABS);
+     * measured rate of change. Fire when:
+     *   - sensor reading is valid,
+     *   - LOW_GLUCOSE is not already active (no double-firing),
+     *   - rate is falling fast enough to trust the forecast,
+     *   - projected glucose is below the configured threshold.
+     * Cleared with hysteresis: projection must recover above threshold +
+     * CONFIG_PREDICTED_LOW_CLEAR_HYST to avoid flapping. */
+    if (glucose_mgdl != GLUCOSE_INVALID &&
+        !s_alert.alerts[ALERT_LOW_GLUCOSE].active) {
+        float horizon = (float)s_alert.config.prediction_horizon_min;
+        float predicted = (float)glucose_mgdl + rate_mgdl_per_min * horizon;
+        uint16_t threshold = s_alert.config.predicted_low_threshold;
+        bool falling = rate_mgdl_per_min <= CONFIG_PREDICTION_MIN_FALL_RATE;
 
-        if (inputs_valid) {
-            float horizon = (float)s_alert.config.prediction_horizon_min;
-            float predicted =
-                (float)glucose_mgdl + rate_mgdl_per_min * horizon;
-            uint16_t threshold = s_alert.config.predicted_low_threshold;
-            bool falling =
-                rate_mgdl_per_min <= CONFIG_PREDICTION_MIN_FALL_RATE;
-
-            if (falling && predicted < (float)threshold) {
-                if (!is_snoozed(ALERT_PREDICTED_LOW) &&
-                    !s_alert.alerts[ALERT_PREDICTED_LOW].active) {
-                    s_alert.alerts[ALERT_PREDICTED_LOW].active = true;
-                    s_alert.alerts[ALERT_PREDICTED_LOW].first_triggered_ms =
-                        get_uptime_ms();
-                }
-            } else if (s_alert.alerts[ALERT_PREDICTED_LOW].active &&
-                       predicted >= (float)(threshold +
-                                            CONFIG_PREDICTED_LOW_CLEAR_HYST)) {
-                s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
+        if (falling && predicted < (float)threshold) {
+            if (!is_snoozed(ALERT_PREDICTED_LOW) &&
+                !s_alert.alerts[ALERT_PREDICTED_LOW].active) {
+                s_alert.alerts[ALERT_PREDICTED_LOW].active = true;
+                s_alert.alerts[ALERT_PREDICTED_LOW].first_triggered_ms =
+                    get_uptime_ms();
             }
+        } else if (s_alert.alerts[ALERT_PREDICTED_LOW].active &&
+                   predicted >= (float)(threshold +
+                                        CONFIG_PREDICTED_LOW_CLEAR_HYST)) {
+            s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
         }
-        /* If inputs_valid is false, leave prior state untouched: a corrupt
-         * sample must neither create nor clear an alert. */
+    } else if (s_alert.alerts[ALERT_LOW_GLUCOSE].active) {
+        /* Real low active — predicted-low is redundant, suppress it. */
+        s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
     }
 
     /* --- High glucose alert (SWR-031, Risk Control RC-004) ---
