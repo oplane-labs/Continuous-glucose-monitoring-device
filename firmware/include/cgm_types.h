@@ -88,14 +88,15 @@ typedef enum {
  * Implements SWR-033 alert prioritization.
  */
 typedef enum {
-    ALERT_SENSOR_FAULT  = 0,    /* Priority: Critical */
-    ALERT_LOW_GLUCOSE   = 1,    /* Priority: Urgent */
-    ALERT_RAPID_FALL    = 2,    /* Priority: Urgent */
-    ALERT_HIGH_GLUCOSE  = 3,    /* Priority: Warning */
-    ALERT_RAPID_RISE    = 4,    /* Priority: Warning */
-    ALERT_LOW_BATTERY   = 5,    /* Priority: Info */
-    ALERT_SIGNAL_LOSS   = 6,    /* Priority: Info */
-    ALERT_TYPE_COUNT    = 7
+    ALERT_SENSOR_FAULT   = 0,   /* Priority: Critical */
+    ALERT_LOW_GLUCOSE    = 1,   /* Priority: Urgent */
+    ALERT_PREDICTED_LOW  = 2,   /* Priority: Urgent (SWR-035) */
+    ALERT_RAPID_FALL     = 3,   /* Priority: Urgent */
+    ALERT_HIGH_GLUCOSE   = 4,   /* Priority: Warning */
+    ALERT_RAPID_RISE     = 5,   /* Priority: Warning */
+    ALERT_LOW_BATTERY    = 6,   /* Priority: Info */
+    ALERT_SIGNAL_LOSS    = 7,   /* Priority: Info */
+    ALERT_TYPE_COUNT     = 8
 } alert_type_t;
 
 /**
@@ -140,6 +141,8 @@ typedef struct {
     int16_t  rapid_fall_rate;           /* Default: -2 mg/dL/min (Q8.8) */
     int16_t  rapid_rise_rate;           /* Default: +3 mg/dL/min (Q8.8) */
     uint16_t snooze_duration_minutes;   /* 0 = disabled */
+    uint16_t predicted_low_threshold;   /* Default: 70 mg/dL (SWR-035) */
+    uint8_t  prediction_horizon_min;    /* Default: 20 minutes (SWR-035) */
 } alert_config_t;
 
 /**

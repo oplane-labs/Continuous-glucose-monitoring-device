@@ -34,13 +34,14 @@ static struct {
 
 /* Priority mapping (SWR-033) - lower index = higher priority */
 static const alert_priority_t s_priority_map[ALERT_TYPE_COUNT] = {
-    [ALERT_SENSOR_FAULT] = ALERT_PRIORITY_CRITICAL,
-    [ALERT_LOW_GLUCOSE]  = ALERT_PRIORITY_URGENT,
-    [ALERT_RAPID_FALL]   = ALERT_PRIORITY_URGENT,
-    [ALERT_HIGH_GLUCOSE] = ALERT_PRIORITY_WARNING,
-    [ALERT_RAPID_RISE]   = ALERT_PRIORITY_WARNING,
-    [ALERT_LOW_BATTERY]  = ALERT_PRIORITY_INFO,
-    [ALERT_SIGNAL_LOSS]  = ALERT_PRIORITY_INFO,
+    [ALERT_SENSOR_FAULT]  = ALERT_PRIORITY_CRITICAL,
+    [ALERT_LOW_GLUCOSE]   = ALERT_PRIORITY_URGENT,
+    [ALERT_PREDICTED_LOW] = ALERT_PRIORITY_URGENT,
+    [ALERT_RAPID_FALL]    = ALERT_PRIORITY_URGENT,
+    [ALERT_HIGH_GLUCOSE]  = ALERT_PRIORITY_WARNING,
+    [ALERT_RAPID_RISE]    = ALERT_PRIORITY_WARNING,
+    [ALERT_LOW_BATTERY]   = ALERT_PRIORITY_INFO,
+    [ALERT_SIGNAL_LOSS]   = ALERT_PRIORITY_INFO,
 };
 
 static uint32_t get_uptime_ms(void);
@@ -56,6 +57,8 @@ cgm_error_t alert_init(void)
     s_alert.config.rapid_fall_rate = CONFIG_RAPID_FALL_RATE;
     s_alert.config.rapid_rise_rate = CONFIG_RAPID_RISE_RATE;
     s_alert.config.snooze_duration_minutes = 30; /* Default 30 min snooze */
+    s_alert.config.predicted_low_threshold = CONFIG_PREDICTED_LOW_DEFAULT;
+    s_alert.config.prediction_horizon_min = CONFIG_PREDICTION_HORIZON_MIN;
 
     s_alert.initialized = true;
     return CGM_OK;
@@ -105,6 +108,39 @@ cgm_error_t alert_evaluate(uint16_t glucose_mgdl, float rate_mgdl_per_min,
     } else {
         s_alert.alerts[ALERT_LOW_GLUCOSE].active = false;
         s_alert.alerts[ALERT_LOW_GLUCOSE].consecutive_count = 0;
+    }
+
+    /* --- Predicted low alert (SWR-035) ---
+     * Project current glucose forward by the configured horizon using the
+     * measured rate of change. Fire when:
+     *   - sensor reading is valid,
+     *   - LOW_GLUCOSE is not already active (no double-firing),
+     *   - rate is falling fast enough to trust the forecast,
+     *   - projected glucose is below the configured threshold.
+     * Cleared with hysteresis: projection must recover above threshold +
+     * CONFIG_PREDICTED_LOW_CLEAR_HYST to avoid flapping. */
+    if (glucose_mgdl != GLUCOSE_INVALID &&
+        !s_alert.alerts[ALERT_LOW_GLUCOSE].active) {
+        float horizon = (float)s_alert.config.prediction_horizon_min;
+        float predicted = (float)glucose_mgdl + rate_mgdl_per_min * horizon;
+        uint16_t threshold = s_alert.config.predicted_low_threshold;
+        bool falling = rate_mgdl_per_min <= CONFIG_PREDICTION_MIN_FALL_RATE;
+
+        if (falling && predicted < (float)threshold) {
+            if (!is_snoozed(ALERT_PREDICTED_LOW) &&
+                !s_alert.alerts[ALERT_PREDICTED_LOW].active) {
+                s_alert.alerts[ALERT_PREDICTED_LOW].active = true;
+                s_alert.alerts[ALERT_PREDICTED_LOW].first_triggered_ms =
+                    get_uptime_ms();
+            }
+        } else if (s_alert.alerts[ALERT_PREDICTED_LOW].active &&
+                   predicted >= (float)(threshold +
+                                        CONFIG_PREDICTED_LOW_CLEAR_HYST)) {
+            s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
+        }
+    } else if (s_alert.alerts[ALERT_LOW_GLUCOSE].active) {
+        /* Real low active — predicted-low is redundant, suppress it. */
+        s_alert.alerts[ALERT_PREDICTED_LOW].active = false;
     }
 
     /* --- High glucose alert (SWR-031, Risk Control RC-004) ---
@@ -218,6 +254,16 @@ cgm_error_t alert_set_config(const alert_config_t *config)
     }
     if (config->high_glucose_threshold < CONFIG_HIGH_GLUCOSE_MIN ||
         config->high_glucose_threshold > CONFIG_HIGH_GLUCOSE_MAX) {
+        return CGM_ERR_CAL_REFERENCE_OOR;
+    }
+    /* Predicted-low threshold must sit between the hard low alert and a
+     * sensible upper bound; horizon must be non-zero (SWR-035). */
+    if (config->predicted_low_threshold <= config->low_glucose_threshold ||
+        config->predicted_low_threshold > 100) {
+        return CGM_ERR_CAL_REFERENCE_OOR;
+    }
+    if (config->prediction_horizon_min == 0 ||
+        config->prediction_horizon_min > 60) {
         return CGM_ERR_CAL_REFERENCE_OOR;
     }
 

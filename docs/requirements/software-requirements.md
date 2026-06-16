@@ -128,11 +128,12 @@ The firmware shall generate a RAPID_FALL alert when the calculated rate of chang
 The firmware shall prioritize alerts in the following order (highest first):
 1. SENSOR_FAULT (Priority: Critical)
 2. LOW_GLUCOSE (Priority: Urgent)
-3. RAPID_FALL (Priority: Urgent)
-4. HIGH_GLUCOSE (Priority: Warning)
-5. RAPID_RISE (Priority: Warning)
-6. LOW_BATTERY (Priority: Info)
-7. SIGNAL_LOSS (Priority: Info)
+3. PREDICTED_LOW (Priority: Urgent)
+4. RAPID_FALL (Priority: Urgent)
+5. HIGH_GLUCOSE (Priority: Warning)
+6. RAPID_RISE (Priority: Warning)
+7. LOW_BATTERY (Priority: Info)
+8. SIGNAL_LOSS (Priority: Info)
 - **Traces to**: SYS-REQ-010, SYS-REQ-011, SYS-REQ-014
 - **Verification**: Unit Test (SWR-VER-033)
 - **Safety Class**: C
@@ -142,6 +143,13 @@ The firmware shall support a configurable snooze period (15, 30, 60, or 120 minu
 - **Traces to**: UN-003, UN-004
 - **Verification**: Unit Test (SWR-VER-034)
 - **Safety Class**: B
+
+### SWR-035: Predicted Low Glucose Alert
+The firmware shall generate a PREDICTED_LOW alert when the projected glucose value, computed by linear extrapolation of the current rate of change over a configurable horizon (default 20 minutes), falls below a configurable threshold (default 70 mg/dL), provided the current rate of change is at least -1 mg/dL/min (i.e. glucose is falling). The alert shall be suppressed while LOW_GLUCOSE is active and shall clear with hysteresis once the projection recovers above (threshold + 10 mg/dL).
+- **Traces to**: UN-002 (early warning), SYS-REQ-012
+- **Verification**: Unit Test (SWR-VER-035)
+- **Safety Class**: C
+- **Risk Control**: Mitigates delayed hypoglycemia recognition by surfacing imminent lows before the hard threshold is breached.
 
 ## 5. BLE Communication Requirements
 
