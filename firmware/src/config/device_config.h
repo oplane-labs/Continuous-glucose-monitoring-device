@@ -52,6 +52,11 @@
 #define CONFIG_CRITICAL_LOW_MGDL        45      /* Non-snoozable threshold */
 #define CONFIG_SIGNAL_LOSS_TIMEOUT_MS   1200000 /* 20 minutes */
 
+/* Sensor expiring-soon warning (SWR-006) */
+#define CONFIG_EXPIRING_WARNING_MIN     1440    /* 24 hours before EOL */
+#define CONFIG_EXPIRING_WARNING_MIN_MIN 60      /* Min configurable lead time */
+#define CONFIG_EXPIRING_WARNING_MIN_MAX 4320    /* 72 hours max lead time */
+
 /* --- BLE configuration --- */
 #define CONFIG_BLE_DEVICE_NAME          "GlucoSense CGM"
 #define CONFIG_BLE_ADV_INTERVAL_FAST_MS 1000

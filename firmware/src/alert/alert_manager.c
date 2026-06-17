@@ -2,8 +2,8 @@
  * @file alert_manager.c
  * @brief Alert management implementation
  *
- * Implements: SWR-030, SWR-031, SWR-032, SWR-033, SWR-034
- * Risk Controls: RC-003, RC-004, RC-005, RC-006
+ * Implements: SWR-006, SWR-030, SWR-031, SWR-032, SWR-033, SWR-034
+ * Risk Controls: RC-003, RC-004, RC-005, RC-006, RC-008
  */
 
 #include "alert_manager.h"
@@ -39,6 +39,7 @@ static const alert_priority_t s_priority_map[ALERT_TYPE_COUNT] = {
     [ALERT_RAPID_FALL]   = ALERT_PRIORITY_URGENT,
     [ALERT_HIGH_GLUCOSE] = ALERT_PRIORITY_WARNING,
     [ALERT_RAPID_RISE]   = ALERT_PRIORITY_WARNING,
+    [ALERT_SENSOR_EXPIRING] = ALERT_PRIORITY_WARNING,
     [ALERT_LOW_BATTERY]  = ALERT_PRIORITY_INFO,
     [ALERT_SIGNAL_LOSS]  = ALERT_PRIORITY_INFO,
 };
@@ -56,6 +57,7 @@ cgm_error_t alert_init(void)
     s_alert.config.rapid_fall_rate = CONFIG_RAPID_FALL_RATE;
     s_alert.config.rapid_rise_rate = CONFIG_RAPID_RISE_RATE;
     s_alert.config.snooze_duration_minutes = 30; /* Default 30 min snooze */
+    s_alert.config.expiring_soon_warning_min = CONFIG_EXPIRING_WARNING_MIN;
 
     s_alert.initialized = true;
     return CGM_OK;
@@ -220,6 +222,10 @@ cgm_error_t alert_set_config(const alert_config_t *config)
         config->high_glucose_threshold > CONFIG_HIGH_GLUCOSE_MAX) {
         return CGM_ERR_CAL_REFERENCE_OOR;
     }
+    if (config->expiring_soon_warning_min < CONFIG_EXPIRING_WARNING_MIN_MIN ||
+        config->expiring_soon_warning_min > CONFIG_EXPIRING_WARNING_MIN_MAX) {
+        return CGM_ERR_CAL_REFERENCE_OOR;
+    }
 
     s_alert.config = *config;
     return CGM_OK;
@@ -228,6 +234,39 @@ cgm_error_t alert_set_config(const alert_config_t *config)
 const alert_config_t *alert_get_config(void)
 {
     return &s_alert.config;
+}
+
+/**
+ * @brief Check sensor lifetime and raise expiring-soon warning (SWR-006, RC-008).
+ *
+ * Once cumulative runtime is within the configured warning window of the
+ * 14-day end-of-life, ALERT_SENSOR_EXPIRING is raised so the user has time
+ * to obtain a replacement sensor. Suppressed once the sensor has actually
+ * expired — at that point the sensor module transitions to SENSOR_STATE_EXPIRED
+ * and ALERT_SENSOR_FAULT takes over.
+ */
+cgm_error_t alert_check_sensor_lifetime(uint32_t runtime_minutes)
+{
+    if (!s_alert.initialized) {
+        return CGM_ERR_SIGNAL_INSUFFICIENT;
+    }
+
+    uint32_t lead = s_alert.config.expiring_soon_warning_min;
+    bool expired = runtime_minutes >= SENSOR_LIFETIME_MINUTES;
+    bool in_window = !expired &&
+                     runtime_minutes + lead >= SENSOR_LIFETIME_MINUTES;
+
+    if (in_window) {
+        if (!is_snoozed(ALERT_SENSOR_EXPIRING) &&
+            !s_alert.alerts[ALERT_SENSOR_EXPIRING].active) {
+            s_alert.alerts[ALERT_SENSOR_EXPIRING].active = true;
+            s_alert.alerts[ALERT_SENSOR_EXPIRING].first_triggered_ms =
+                get_uptime_ms();
+        }
+    } else {
+        s_alert.alerts[ALERT_SENSOR_EXPIRING].active = false;
+    }
+    return CGM_OK;
 }
 
 /**

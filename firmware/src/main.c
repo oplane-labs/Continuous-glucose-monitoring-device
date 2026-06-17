@@ -169,6 +169,9 @@ int firmware_main(void)
         /* Check for signal loss (RC-006) */
         alert_check_signal_loss(now - s_last_reading_time_ms);
 
+        /* Warn the user 24 h before sensor end-of-life (SWR-006, RC-008) */
+        alert_check_sensor_lifetime(sensor_get_runtime_minutes());
+
         /* Enter low-power sleep until next event (SWR-060) */
         power_enter_sleep();
 
