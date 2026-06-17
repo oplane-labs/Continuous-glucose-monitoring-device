@@ -31,6 +31,7 @@ set(FIRMWARE_SOURCES
     src/ble/cgm_service.c
     src/storage/flash_storage.c
     src/alert/alert_manager.c
+    src/stats/glucose_stats.c
     src/power/power_manager.c
 )
 
@@ -91,4 +92,8 @@ else()
     add_executable(test_alert_manager tests/test_alert_manager.c)
     target_link_libraries(test_alert_manager firmware_lib unity)
     add_test(NAME test_alert_manager COMMAND test_alert_manager)
+
+    add_executable(test_glucose_stats tests/test_glucose_stats.c)
+    target_link_libraries(test_glucose_stats firmware_lib unity)
+    add_test(NAME test_glucose_stats COMMAND test_glucose_stats)
 endif()

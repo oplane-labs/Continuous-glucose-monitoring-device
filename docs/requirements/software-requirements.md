@@ -223,7 +223,27 @@ The firmware shall perform a graceful shutdown sequence (save current state to f
 - **Verification**: Unit Test (SWR-VER-062)
 - **Safety Class**: B
 
-## 8. Watchdog and Self-Test Requirements
+## 8. Glucose Statistics Requirements
+
+### SWR-080: Rolling Glucose Sample Buffer
+The firmware shall maintain rolling 24-hour and 7-day buffers of valid glucose readings, fed by the measurement pipeline and indexed by reading timestamp. Readings flagged invalid (`GLUCOSE_INVALID`) or outside the physiological range [40, 400] mg/dL shall be dropped. Stale entries shall be evicted from the buffers based on reading timestamps so that wall-clock drift, watchdog recovery, and sensor gaps do not corrupt the windows.
+- **Traces to**: SYS-REQ-022 (clinical reporting)
+- **Verification**: Unit Test (SWR-VER-080)
+- **Safety Class**: B
+
+### SWR-081: Time-in-Range / Below / Above Reporting
+The firmware shall compute, on demand, the percentages of readings inside, below, and above a configurable in-range band (default 70–180 mg/dL per ATTD 2019), reported in tenths of a percent. Snapshots taken from windows with fewer than 12 samples (1 hour of data) shall return `CGM_ERR_SIGNAL_INSUFFICIENT` rather than misleading values.
+- **Traces to**: UN-005 (clinical metrics), SYS-REQ-022
+- **Verification**: Unit Test (SWR-VER-081)
+- **Safety Class**: B
+
+### SWR-082: Glucose Management Indicator and Coefficient of Variation
+The firmware shall compute the Glucose Management Indicator (GMI) per the Bergenstal et al. (2018) formula `GMI(%) = 3.31 + 0.02392 × mean_glucose_mgdl` and the Coefficient of Variation `CV(%) = 100 × stddev / mean` for both the 24-hour and 7-day windows. Both metrics shall be reported in % × 10.
+- **Traces to**: UN-005 (clinical metrics)
+- **Verification**: Unit Test (SWR-VER-082)
+- **Safety Class**: B
+
+## 9. Watchdog and Self-Test Requirements
 
 ### SWR-070: Watchdog Timer
 The firmware shall configure a hardware watchdog timer with a 4-second timeout. The main loop shall service the watchdog at least once per iteration. Failure to service the watchdog shall trigger a system reset.

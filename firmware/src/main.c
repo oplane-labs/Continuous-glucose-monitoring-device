@@ -14,6 +14,7 @@
 #include "sensor/calibration.h"
 #include "signal/signal_processing.h"
 #include "alert/alert_manager.h"
+#include "stats/glucose_stats.h"
 #include "ble/ble_manager.h"
 #include "ble/cgm_service.h"
 #include "storage/flash_storage.h"
@@ -89,6 +90,7 @@ int firmware_main(void)
     calibration_init();
     signal_init();
     alert_init();
+    stats_init();
     power_init();
 
     /* Step 4: Initialize BLE and register callbacks */
@@ -221,6 +223,9 @@ static void measurement_cycle(void)
     if (alert_get_highest_priority(&highest_alert) == CGM_OK) {
         reading.status_flags |= 0x04; /* Bit 2 = alert_active */
     }
+
+    /* Feed the rolling Time-in-Range / GMI / CV windows (SWR-080) */
+    stats_record_reading(&reading);
 
     /* Store reading to flash for backfill capability (SWR-050) */
     flash_store_reading(&reading);

@@ -76,6 +76,14 @@
 #define CONFIG_BATTERY_FULL_MV              3000    /* CR2032 nominal voltage */
 #define CONFIG_SLEEP_CURRENT_UA             5       /* Target sleep current */
 
+/* --- Glucose statistics (TIR / GMI / CV) (SWR-080..082) --- */
+#define CONFIG_STATS_BUFFER_CAPACITY    2048    /* >= 7d at 5-min cadence */
+#define CONFIG_STATS_TIR_LOW_DEFAULT    70      /* mg/dL (ATTD 2019) */
+#define CONFIG_STATS_TIR_HIGH_DEFAULT   180     /* mg/dL (ATTD 2019) */
+#define CONFIG_STATS_TIR_LOW_MIN        50      /* mg/dL */
+#define CONFIG_STATS_TIR_HIGH_MAX       300     /* mg/dL */
+#define CONFIG_STATS_MIN_SAMPLES        12      /* 1 h of data minimum */
+
 /* --- Watchdog --- */
 #define CONFIG_WATCHDOG_TIMEOUT_MS      4000
 
