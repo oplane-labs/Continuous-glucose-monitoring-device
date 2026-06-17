@@ -188,6 +188,65 @@ void test_signal_loss_alert(void)
 }
 
 /**
+ * @test SWR-VER-006: Sensor expiring-soon alert fires inside the warning
+ * window (default 24 h before EOL) and clears after sensor replacement.
+ */
+void test_sensor_expiring_alert_fires(void)
+{
+    /* 13 days, 23 hours of runtime — inside the 24 h warning window. */
+    uint32_t in_window = SENSOR_LIFETIME_MINUTES - 60;
+    alert_check_sensor_lifetime(in_window);
+    TEST_ASSERT_TRUE(alert_is_active(ALERT_SENSOR_EXPIRING));
+
+    /* Sensor replaced — runtime resets, alert clears. */
+    alert_check_sensor_lifetime(0);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_SENSOR_EXPIRING));
+}
+
+/**
+ * @test SWR-VER-006: No expiring-soon warning while sensor is still well
+ * inside its useful life.
+ */
+void test_sensor_expiring_no_fire_early(void)
+{
+    /* 10 days of runtime — far outside the 24 h warning window. */
+    alert_check_sensor_lifetime(14400);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_SENSOR_EXPIRING));
+}
+
+/**
+ * @test SWR-VER-006: Once the sensor has actually expired, the
+ * expiring-soon warning is suppressed (SENSOR_FAULT/EXPIRED takes over).
+ */
+void test_sensor_expiring_suppressed_after_eol(void)
+{
+    /* Drive into the warning window first. */
+    alert_check_sensor_lifetime(SENSOR_LIFETIME_MINUTES - 60);
+    TEST_ASSERT_TRUE(alert_is_active(ALERT_SENSOR_EXPIRING));
+
+    /* Cross EOL — expiring warning must drop. */
+    alert_check_sensor_lifetime(SENSOR_LIFETIME_MINUTES);
+    TEST_ASSERT_FALSE(alert_is_active(ALERT_SENSOR_EXPIRING));
+}
+
+/**
+ * @test SWR-VER-006: alert_set_config rejects a warning lead time outside
+ * the allowed 1–72 hour band.
+ */
+void test_sensor_expiring_config_validation(void)
+{
+    alert_config_t cfg = *alert_get_config();
+    cfg.expiring_soon_warning_min = 30; /* 30 min, below 1 h floor */
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    cfg.expiring_soon_warning_min = 7200; /* 5 days, above 72 h ceiling */
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    cfg.expiring_soon_warning_min = 1440; /* 24 h, default — accepted */
+    TEST_ASSERT_EQUAL(CGM_OK, alert_set_config(&cfg));
+}
+
+/**
  * @test No active alerts returns appropriate error
  */
 void test_no_active_alerts(void)
@@ -211,6 +270,10 @@ int main(void)
     RUN_TEST(test_critical_alert_not_snoozable);
     RUN_TEST(test_critical_low_not_snoozable);
     RUN_TEST(test_signal_loss_alert);
+    RUN_TEST(test_sensor_expiring_alert_fires);
+    RUN_TEST(test_sensor_expiring_no_fire_early);
+    RUN_TEST(test_sensor_expiring_suppressed_after_eol);
+    RUN_TEST(test_sensor_expiring_config_validation);
     RUN_TEST(test_no_active_alerts);
 
     return UNITY_END();

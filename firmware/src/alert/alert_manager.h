@@ -6,7 +6,7 @@
  * prioritized alerts for hypo/hyperglycemia, rapid rate changes, sensor
  * faults, and system conditions.
  *
- * Implements: SWR-030, SWR-031, SWR-032, SWR-033, SWR-034
+ * Implements: SWR-006, SWR-030, SWR-031, SWR-032, SWR-033, SWR-034
  */
 
 #ifndef ALERT_MANAGER_H
@@ -58,6 +58,15 @@ cgm_error_t alert_set_config(const alert_config_t *config);
  * @brief Get current alert configuration.
  */
 const alert_config_t *alert_get_config(void);
+
+/**
+ * @brief Update sensor lifetime status; raises ALERT_SENSOR_EXPIRING when
+ * the remaining sensor runtime falls below the configured warning lead time
+ * (SWR-006). The alert clears automatically once the sensor is replaced
+ * (runtime resets) and is replaced by ALERT_SENSOR_FAULT/EXPIRED at EOL.
+ * @param[in] runtime_minutes  Cumulative sensor runtime in minutes.
+ */
+cgm_error_t alert_check_sensor_lifetime(uint32_t runtime_minutes);
 
 /**
  * @brief Notify alert manager that a signal loss condition may exist.

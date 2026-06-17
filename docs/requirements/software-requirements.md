@@ -41,6 +41,12 @@ The firmware shall track cumulative sensor insertion time and disable glucose re
 - **Verification**: Unit Test (SWR-VER-005)
 - **Safety Class**: B
 
+### SWR-006: Sensor Expiring-Soon Warning
+The firmware shall raise a SENSOR_EXPIRING warning alert when the cumulative sensor runtime is within a configurable lead time (default 24 hours, range 1–72 hours) of the 14-day end-of-life, so that users have advance notice to obtain a replacement sensor and avoid an unplanned monitoring gap. The warning shall clear automatically once a fresh sensor is inserted (runtime resets), and shall be superseded by SENSOR_FAULT/EXPIRED at end-of-life.
+- **Traces to**: UN-004 (continuity of monitoring), SYS-REQ-005
+- **Verification**: Unit Test (SWR-VER-006)
+- **Safety Class**: B
+
 ## 2. Signal Processing Requirements
 
 ### SWR-010: Noise Filtering
@@ -131,8 +137,9 @@ The firmware shall prioritize alerts in the following order (highest first):
 3. RAPID_FALL (Priority: Urgent)
 4. HIGH_GLUCOSE (Priority: Warning)
 5. RAPID_RISE (Priority: Warning)
-6. LOW_BATTERY (Priority: Info)
-7. SIGNAL_LOSS (Priority: Info)
+6. SENSOR_EXPIRING (Priority: Warning)
+7. LOW_BATTERY (Priority: Info)
+8. SIGNAL_LOSS (Priority: Info)
 - **Traces to**: SYS-REQ-010, SYS-REQ-011, SYS-REQ-014
 - **Verification**: Unit Test (SWR-VER-033)
 - **Safety Class**: C
