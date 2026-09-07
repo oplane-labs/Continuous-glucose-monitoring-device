@@ -153,6 +153,7 @@ The firmware shall implement a BLE GATT service conforming to the Bluetooth SIG 
 - CGM Session Start Time (UUID: 0x2AAA)
 - CGM Session Run Time (UUID: 0x2AAB)
 - Record Access Control Point (UUID: 0x2A52)
+- CGM Specific Ops Control Point (UUID: 0x2AAC)
 - **Traces to**: SYS-REQ-030
 - **Verification**: Integration Test (SWR-VER-040)
 - **Safety Class**: B
@@ -181,6 +182,20 @@ The firmware shall advertise with a 1-second interval when no device is connecte
 - **Traces to**: SYS-REQ-050
 - **Verification**: Unit Test (SWR-VER-044)
 - **Safety Class**: A
+
+### SWR-045: CGM Specific Ops Control Point
+The firmware shall implement the CGM Specific Ops Control Point characteristic (UUID: 0x2AAC) of the CGM GATT service, allowing an authenticated client to read and configure the device alert levels and to control the measurement session. The control point shall support the following operations:
+1. Set/Get Patient High Alert Level (maps to the high glucose alert threshold)
+2. Set/Get Patient Low Alert Level (maps to the low glucose alert threshold)
+3. Set/Get Rate of Decrease Alert Level (maps to the rapid-fall rate threshold)
+4. Set/Get Rate of Increase Alert Level (maps to the rapid-rise rate threshold)
+5. Reset Device Specific Alert
+6. Start / Stop the Session
+
+Each request shall produce a response message: a value response for a Get operation, or a Response Code for a Set or session operation. Set operations shall reuse the alert-configuration validation (SWR-034 thresholds); a value outside the permitted range shall be rejected with a "Parameter out of range" response code and shall not change the stored configuration. Requests with a missing operand shall return "Invalid Operand", and unimplemented op codes shall return "Op Code not supported".
+- **Traces to**: SYS-REQ-030, UN-003, UN-004
+- **Verification**: Unit Test (SWR-VER-045)
+- **Safety Class**: B
 
 ## 6. Storage Requirements
 
