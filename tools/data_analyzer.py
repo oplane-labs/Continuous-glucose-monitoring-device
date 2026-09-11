@@ -62,7 +62,7 @@ class SensorReport:
 def load_glucose_data(filepath: Path) -> list[GlucoseReading]:
     """Load glucose readings from a CSV export file."""
     readings = []
-    with open(filepath, newline='') as f:
+    with open(filepath, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             ref = int(row['reference_mgdl']) if row.get('reference_mgdl') else None
