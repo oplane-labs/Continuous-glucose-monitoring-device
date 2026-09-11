@@ -62,7 +62,7 @@ class SensorReport:
 def load_glucose_data(filepath: Path) -> list[GlucoseReading]:
     """Load glucose readings from a CSV export file."""
     readings = []
-    with open(filepath, newline='') as f:
+    with open(filepath, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             ref = int(row['reference_mgdl']) if row.get('reference_mgdl') else None
@@ -225,7 +225,7 @@ def main():
 
     if args.report_type == 'accuracy':
         report = compute_mard(readings)
-        print(f"\n=== Accuracy Report (SYS-REQ-002) ===")
+        print("\n=== Accuracy Report (SYS-REQ-002) ===")
         print(f"MARD:              {report.mard_percent:.1f}%")
         print(f"Total paired:      {report.total_pairs}")
         print(f"Zone A:            {report.pairs_in_zone_a} "
@@ -247,7 +247,7 @@ def main():
 
     elif args.report_type == 'fleet':
         summary = generate_fleet_summary(readings)
-        print(f"\n=== Fleet Summary (Post-Market Surveillance) ===")
+        print("\n=== Fleet Summary (Post-Market Surveillance) ===")
         print(f"Total sensors:        {summary['total_sensors']}")
         print(f"Total readings:       {summary['total_readings']}")
         if summary['fleet_mard'] is not None:
