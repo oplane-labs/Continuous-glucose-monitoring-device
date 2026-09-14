@@ -197,6 +197,61 @@ void test_no_active_alerts(void)
     TEST_ASSERT_NOT_EQUAL(CGM_OK, err);
 }
 
+/**
+ * @test SWR-VER-034: alert_set_config rejects out-of-range rapid rate thresholds
+ *
+ * Guards the safety-critical rate alerts (RC-005) against remote SOCP
+ * misconfiguration: an extreme magnitude disables the alert, a near-zero or
+ * wrong-sign value makes it fire on normal glucose drift.
+ */
+void test_set_config_rejects_out_of_range_rates(void)
+{
+    alert_config_t cfg = *alert_get_config();
+
+    /* Baseline: the defaults are valid and accepted */
+    TEST_ASSERT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    /* rapid_fall_rate must stay strictly negative and bounded */
+    cfg = *alert_get_config();
+    cfg.rapid_fall_rate = 0;
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+    cfg.rapid_fall_rate = -32768;
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    /* rapid_rise_rate must stay strictly positive and bounded */
+    cfg = *alert_get_config();
+    cfg.rapid_rise_rate = 0;
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+    cfg.rapid_rise_rate = 32767;
+    TEST_ASSERT_NOT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    /* A rejected write must not mutate the stored configuration */
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE,
+                            alert_get_config()->rapid_fall_rate);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE,
+                            alert_get_config()->rapid_rise_rate);
+}
+
+/**
+ * @test SWR-VER-034: alert_set_config accepts rate thresholds at the boundaries
+ */
+void test_set_config_accepts_rate_boundaries(void)
+{
+    alert_config_t cfg = *alert_get_config();
+
+    cfg.rapid_fall_rate = CONFIG_RAPID_FALL_RATE_MIN;
+    cfg.rapid_rise_rate = CONFIG_RAPID_RISE_RATE_MAX;
+    TEST_ASSERT_EQUAL(CGM_OK, alert_set_config(&cfg));
+
+    cfg.rapid_fall_rate = CONFIG_RAPID_FALL_RATE_MAX;
+    cfg.rapid_rise_rate = CONFIG_RAPID_RISE_RATE_MIN;
+    TEST_ASSERT_EQUAL(CGM_OK, alert_set_config(&cfg));
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE_MAX,
+                            alert_get_config()->rapid_fall_rate);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE_MIN,
+                            alert_get_config()->rapid_rise_rate);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -212,6 +267,8 @@ int main(void)
     RUN_TEST(test_critical_low_not_snoozable);
     RUN_TEST(test_signal_loss_alert);
     RUN_TEST(test_no_active_alerts);
+    RUN_TEST(test_set_config_rejects_out_of_range_rates);
+    RUN_TEST(test_set_config_accepts_rate_boundaries);
 
     return UNITY_END();
 }

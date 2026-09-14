@@ -182,6 +182,83 @@ void test_socp_rate_levels_signed(void)
 }
 
 /**
+ * @test SWR-VER-045: Out-of-range rate-of-decrease is rejected, config unchanged
+ *
+ * A rate-of-decrease threshold of 0 (or positive) would make the rapid-fall
+ * alert fire on normal drift; an extreme negative value would disable it.
+ * Both must be rejected with PARAM_OUT_OF_RANGE and leave the default intact.
+ */
+void test_socp_set_rate_decrease_out_of_range(void)
+{
+    uint8_t  resp[8];
+    uint16_t n;
+
+    /* Zero / wrong-sign: outside [CONFIG_RAPID_FALL_RATE_MIN, MAX] = [-10,-1] */
+    socp_set_value(SOCP_OP_SET_RATE_DECREASE, 0, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_OP_RESPONSE_CODE, resp[0]);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_PARAM_OUT_OF_RANGE, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE,
+                            alert_get_config()->rapid_fall_rate);
+
+    /* Extreme magnitude (int16 min) would disable the alert entirely */
+    socp_set_value(SOCP_OP_SET_RATE_DECREASE, -32768, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_PARAM_OUT_OF_RANGE, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE,
+                            alert_get_config()->rapid_fall_rate);
+}
+
+/**
+ * @test SWR-VER-045: Out-of-range rate-of-increase is rejected, config unchanged
+ */
+void test_socp_set_rate_increase_out_of_range(void)
+{
+    uint8_t  resp[8];
+    uint16_t n;
+
+    /* Extreme magnitude (int16 max) would make the rapid-rise alert unreachable */
+    socp_set_value(SOCP_OP_SET_RATE_INCREASE, 32767, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_OP_RESPONSE_CODE, resp[0]);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_PARAM_OUT_OF_RANGE, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE,
+                            alert_get_config()->rapid_rise_rate);
+
+    /* Zero: below CONFIG_RAPID_RISE_RATE_MIN (1) */
+    socp_set_value(SOCP_OP_SET_RATE_INCREASE, 0, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_PARAM_OUT_OF_RANGE, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE,
+                            alert_get_config()->rapid_rise_rate);
+}
+
+/**
+ * @test SWR-VER-045: Rate thresholds at the supported boundaries are accepted
+ */
+void test_socp_set_rate_boundary_values(void)
+{
+    uint8_t  resp[8];
+    uint16_t n;
+
+    socp_set_value(SOCP_OP_SET_RATE_DECREASE, CONFIG_RAPID_FALL_RATE_MIN, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_SUCCESS, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE_MIN,
+                            alert_get_config()->rapid_fall_rate);
+
+    socp_set_value(SOCP_OP_SET_RATE_DECREASE, CONFIG_RAPID_FALL_RATE_MAX, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_SUCCESS, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_FALL_RATE_MAX,
+                            alert_get_config()->rapid_fall_rate);
+
+    socp_set_value(SOCP_OP_SET_RATE_INCREASE, CONFIG_RAPID_RISE_RATE_MIN, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_SUCCESS, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE_MIN,
+                            alert_get_config()->rapid_rise_rate);
+
+    socp_set_value(SOCP_OP_SET_RATE_INCREASE, CONFIG_RAPID_RISE_RATE_MAX, resp, &n);
+    TEST_ASSERT_EQUAL_UINT8(SOCP_RSP_SUCCESS, resp[2]);
+    TEST_ASSERT_EQUAL_INT16(CONFIG_RAPID_RISE_RATE_MAX,
+                            alert_get_config()->rapid_rise_rate);
+}
+
+/**
  * @test SWR-VER-045: A Set with a missing operand yields "Invalid Operand"
  */
 void test_socp_set_missing_operand(void)
@@ -270,6 +347,9 @@ int main(void)
     RUN_TEST(test_socp_set_get_patient_low);
     RUN_TEST(test_socp_set_patient_low_out_of_range);
     RUN_TEST(test_socp_rate_levels_signed);
+    RUN_TEST(test_socp_set_rate_decrease_out_of_range);
+    RUN_TEST(test_socp_set_rate_increase_out_of_range);
+    RUN_TEST(test_socp_set_rate_boundary_values);
     RUN_TEST(test_socp_set_missing_operand);
     RUN_TEST(test_socp_unsupported_opcode);
     RUN_TEST(test_socp_session_control);

@@ -220,6 +220,18 @@ cgm_error_t alert_set_config(const alert_config_t *config)
         config->high_glucose_threshold > CONFIG_HIGH_GLUCOSE_MAX) {
         return CGM_ERR_CAL_REFERENCE_OOR;
     }
+    /* Rate thresholds are safety-critical and remotely configurable via SOCP
+     * (SWR-045). Reject values outside the device-supported band so a client
+     * cannot disable the rapid-fall/rise alerts (extreme magnitude) or induce
+     * false positives (magnitude near zero / wrong sign). */
+    if (config->rapid_fall_rate < CONFIG_RAPID_FALL_RATE_MIN ||
+        config->rapid_fall_rate > CONFIG_RAPID_FALL_RATE_MAX) {
+        return CGM_ERR_CAL_REFERENCE_OOR;
+    }
+    if (config->rapid_rise_rate < CONFIG_RAPID_RISE_RATE_MIN ||
+        config->rapid_rise_rate > CONFIG_RAPID_RISE_RATE_MAX) {
+        return CGM_ERR_CAL_REFERENCE_OOR;
+    }
 
     s_alert.config = *config;
     return CGM_OK;

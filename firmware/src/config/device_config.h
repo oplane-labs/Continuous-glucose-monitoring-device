@@ -46,6 +46,15 @@
 #define CONFIG_HIGH_GLUCOSE_MAX         400     /* mg/dL */
 #define CONFIG_RAPID_FALL_RATE          (-2)    /* mg/dL/min */
 #define CONFIG_RAPID_RISE_RATE          3       /* mg/dL/min */
+/* Device-supported bounds for the remotely-configurable rate thresholds
+ * (SWR-045 SOCP). The fall threshold must stay strictly negative and the
+ * rise threshold strictly positive, otherwise the corresponding rate alert
+ * is either disabled (extreme magnitude) or fires on normal drift (magnitude
+ * near zero). Magnitudes are clamped to a clinically plausible 1..10 mg/dL/min. */
+#define CONFIG_RAPID_FALL_RATE_MIN      (-10)   /* mg/dL/min (least sensitive) */
+#define CONFIG_RAPID_FALL_RATE_MAX      (-1)    /* mg/dL/min (most sensitive) */
+#define CONFIG_RAPID_RISE_RATE_MIN      1       /* mg/dL/min (most sensitive) */
+#define CONFIG_RAPID_RISE_RATE_MAX      10      /* mg/dL/min (least sensitive) */
 #define CONFIG_LOW_ALERT_CONSECUTIVE    2       /* Readings before alert */
 #define CONFIG_HIGH_ALERT_CONSECUTIVE   3       /* Readings before alert */
 #define CONFIG_RATE_ALERT_CONSECUTIVE   3       /* Readings before rate alert */
