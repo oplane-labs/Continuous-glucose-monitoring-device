@@ -91,4 +91,8 @@ else()
     add_executable(test_alert_manager tests/test_alert_manager.c)
     target_link_libraries(test_alert_manager firmware_lib unity)
     add_test(NAME test_alert_manager COMMAND test_alert_manager)
+
+    add_executable(test_cgm_service tests/test_cgm_service.c)
+    target_link_libraries(test_cgm_service firmware_lib unity)
+    add_test(NAME test_cgm_service COMMAND test_cgm_service)
 endif()
