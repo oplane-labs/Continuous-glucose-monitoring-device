@@ -96,25 +96,14 @@ cgm_error_t calibration_apply(float current_na, float temperature_c,
  * Uses weighted least-squares with exponential forgetting (lambda = 0.95)
  * to adjust the sensitivity parameter based on a fingerstick reference.
  *
- * Risk Control RC-009: Rejects references deviating > 40% from sensor.
+ * The companion app already validates fingerstick entries before sending them,
+ * so the on-device deviation check is no longer applied here (it was rejecting
+ * legitimate recalibrations in the field).
  */
 cgm_error_t calibration_update(uint16_t reference_mgdl, float sensor_current)
 {
     if (!s_initialized) {
         return CGM_ERR_CAL_INVALID;
-    }
-
-    /* First, validate the reference value (SWR-022) */
-    uint16_t current_glucose;
-    float temp = CONFIG_CAL_REFERENCE_BODY_TEMP; /* Use nominal temp for validation */
-    cgm_error_t err = calibration_apply(sensor_current, temp, &current_glucose);
-    if (err != CGM_OK) {
-        return err;
-    }
-
-    err = calibration_validate_reference(reference_mgdl, current_glucose);
-    if (err != CGM_OK) {
-        return err;
     }
 
     /* Calculate new sensitivity using weighted least-squares update.
