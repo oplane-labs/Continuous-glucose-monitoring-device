@@ -182,6 +182,12 @@ The firmware shall advertise with a 1-second interval when no device is connecte
 - **Verification**: Unit Test (SWR-VER-044)
 - **Safety Class**: A
 
+### SWR-045: Remote In-Vivo Calibration
+The firmware shall allow the companion mobile application to submit a fingerstick blood-glucose reference value over the CGM Specific Ops Control Point characteristic (UUID: 0x2AAC) to trigger an in-vivo calibration update (SWR-021). The reference value shall be paired with the current sensor reading and applied via the calibration module.
+- **Traces to**: SYS-REQ-030, UN-007
+- **Verification**: Integration Test (SWR-VER-045)
+- **Safety Class**: C
+
 ## 6. Storage Requirements
 
 ### SWR-050: Flash Data Storage

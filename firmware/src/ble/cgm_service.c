@@ -2,7 +2,7 @@
  * @file cgm_service.c
  * @brief Bluetooth SIG CGM GATT Service implementation
  *
- * Implements: SWR-040, SWR-041, SWR-043
+ * Implements: SWR-040, SWR-041, SWR-043, SWR-045
  *
  * CGM Service UUID: 0x181F
  * Characteristics:
@@ -12,10 +12,13 @@
  *   - CGM Session Start Time (0x2AAA): Read/Write
  *   - CGM Session Run Time (0x2AAB): Notify
  *   - Record Access Control Point (0x2A52): Write/Indicate
+ *   - CGM Specific Ops Control Point (0x2AAC): Write/Indicate
  */
 
 #include "cgm_service.h"
 #include "../storage/flash_storage.h"
+#include "../sensor/calibration.h"
+#include "../sensor/glucose_sensor.h"
 #include "config/device_config.h"
 
 #ifndef UNIT_TEST
@@ -40,6 +43,10 @@
 #define RACP_OPCODE_ABORT           0x03
 #define RACP_OPCODE_REPORT_COUNT    0x04
 #define RACP_OPCODE_RESPONSE        0x06
+
+/* CGM Specific Ops Control Point (0x2AAC) opcodes (SWR-045) */
+#define SOCP_OPCODE_SET_CALIBRATION  0x04
+#define SOCP_OPCODE_RESPONSE         0x1C
 
 /* Module state */
 static struct {
@@ -168,6 +175,46 @@ cgm_error_t cgm_service_handle_racp(uint8_t opcode, uint8_t operator,
     }
 
     return CGM_OK;
+}
+
+/**
+ * @brief Handle a remote in-vivo calibration request (SWR-045)
+ *
+ * The companion mobile app writes a fingerstick blood-glucose reference to the
+ * CGM Specific Ops Control Point (0x2AAC) so the user can recalibrate the sensor
+ * from the phone instead of the manufacturing UART tool. The reference is applied
+ * against the live sensor current via the calibration module.
+ *
+ * Operand layout (SET_CALIBRATION):
+ *   [0]    Op code (SOCP_OPCODE_SET_CALIBRATION)
+ *   [1-2]  Fingerstick reference glucose, mg/dL (uint16, little-endian)
+ */
+cgm_error_t cgm_service_handle_calibration(const uint8_t *operand, uint16_t len)
+{
+    if (!s_cgm_svc.initialized) {
+        return CGM_ERR_BLE_INIT_FAIL;
+    }
+
+    /* Need at least the op code plus the 2-byte reference value */
+    if (len < 3) {
+        return CGM_ERR_BLE_NOTIFY_FAIL;
+    }
+
+    if (operand[0] != SOCP_OPCODE_SET_CALIBRATION) {
+        return CGM_ERR_BLE_NOTIFY_FAIL;
+    }
+
+    uint16_t reference_mgdl = (uint16_t)(operand[1] | (operand[2] << 8));
+
+    /* Pair the reference with the current live sensor reading and hand it to
+     * the calibration module, which performs the weighted-least-squares update. */
+    float current_na;
+    cgm_error_t err = sensor_read_current(&current_na);
+    if (err != CGM_OK) {
+        return err;
+    }
+
+    return calibration_update(reference_mgdl, current_na);
 }
 
 cgm_error_t cgm_service_update_runtime(uint32_t runtime_minutes)
