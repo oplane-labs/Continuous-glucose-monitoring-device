@@ -51,7 +51,7 @@ Manages factory and in-vivo calibration parameters. Stores parameters in protect
 Evaluates glucose values and rate-of-change against configurable thresholds. Implements alert prioritization, snooze logic, and hysteresis to prevent alert oscillation near threshold boundaries.
 
 ### BLE Service
-Implements the Bluetooth SIG CGM Profile (0x181F). Handles GATT characteristic updates, notifications, connection management, bonding, and data backfill via Record Access Control Point.
+Implements the Bluetooth SIG CGM Profile (0x181F). Handles GATT characteristic updates, notifications, connection management, bonding, and data backfill via Record Access Control Point. The Specific Ops Control Point (0x2AAC) lets the companion app submit a fingerstick reference to trigger a remote in-vivo calibration update.
 
 ### Flash Storage
 Circular buffer implementation for glucose readings on external SPI flash. Provides wear leveling and power-loss-safe writes using a write-ahead log pattern.

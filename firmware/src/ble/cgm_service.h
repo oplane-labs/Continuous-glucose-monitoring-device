@@ -36,6 +36,15 @@ cgm_error_t cgm_service_handle_racp(uint8_t opcode, uint8_t operator,
                                      const uint8_t *operand, uint16_t len);
 
 /**
+ * @brief Handle a remote in-vivo calibration request (SWR-045).
+ * Applies a fingerstick reference written by the mobile app over the CGM
+ * Specific Ops Control Point characteristic (0x2AAC).
+ * @param[in] operand  SOCP request payload (op code + reference value).
+ * @param[in] len      Length of the operand in bytes.
+ */
+cgm_error_t cgm_service_handle_calibration(const uint8_t *operand, uint16_t len);
+
+/**
  * @brief Update the CGM session runtime characteristic.
  * @param[in] runtime_minutes  Minutes since session start.
  */
