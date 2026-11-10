@@ -182,6 +182,12 @@ The firmware shall advertise with a 1-second interval when no device is connecte
 - **Verification**: Unit Test (SWR-VER-044)
 - **Safety Class**: A
 
+### SWR-046: Personalised Device Name
+The firmware shall advertise a personalised device name composed of the wearer's display name (up to 12 characters, written by the companion app during setup) and the most recent glucose value and trend indicator (e.g. `Emma S 64 v`), so that the wearer can identify their own transmitter among nearby devices and compatible watches can show the current reading at a glance. The advertised name shall be refreshed every measurement cycle. When no wearer name is set, the firmware shall fall back to `GlucoSense CGM`; when no valid reading is available, the glucose value and trend shall be omitted.
+- **Traces to**: UN-006, UN-011, SYS-REQ-030
+- **Verification**: Unit Test (SWR-VER-046)
+- **Safety Class**: A
+
 ## 6. Storage Requirements
 
 ### SWR-050: Flash Data Storage

@@ -54,6 +54,8 @@
 
 /* --- BLE configuration --- */
 #define CONFIG_BLE_DEVICE_NAME          "GlucoSense CGM"
+#define CONFIG_BLE_WEARER_NAME_MAX      12      /* chars, excluding NUL */
+#define CONFIG_BLE_ADV_NAME_MAX         26      /* Fits legacy adv payload with flags + UUID */
 #define CONFIG_BLE_ADV_INTERVAL_FAST_MS 1000
 #define CONFIG_BLE_ADV_INTERVAL_SLOW_MS 2000
 #define CONFIG_BLE_ADV_SLOWDOWN_MS      300000  /* 5 min until slow advertising */

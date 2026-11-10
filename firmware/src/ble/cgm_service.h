@@ -5,7 +5,7 @@
  * Implements the CGM Profile (UUID 0x181F) with characteristics for
  * glucose measurement notifications and historical data backfill.
  *
- * Implements: SWR-040, SWR-041, SWR-043
+ * Implements: SWR-040, SWR-041, SWR-043, SWR-046
  */
 
 #ifndef CGM_SERVICE_H
@@ -46,5 +46,13 @@ cgm_error_t cgm_service_update_runtime(uint32_t runtime_minutes);
  * @param[in] status  Current device status.
  */
 cgm_error_t cgm_service_update_status(const device_status_t *status);
+
+/**
+ * @brief Handle a write to the Wearer Name characteristic (SWR-046).
+ * @param[in] data  Wearer display name (UTF-8).
+ * @param[in] len   Length in bytes; truncated to CONFIG_BLE_WEARER_NAME_MAX.
+ */
+cgm_error_t cgm_service_handle_wearer_name_write(const uint8_t *data,
+                                                 uint16_t len);
 
 #endif /* CGM_SERVICE_H */

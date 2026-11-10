@@ -226,6 +226,9 @@ static void measurement_cycle(void)
     flash_store_reading(&reading);
     s_device_status.readings_stored = flash_get_reading_count();
 
+    /* Refresh glanceable reading in the advertised name (SWR-046) */
+    ble_update_glance(reading.glucose_mgdl, (glucose_trend_t)reading.trend);
+
     /* Send BLE notification if connected (SWR-041) */
     if (ble_is_connected()) {
         cgm_service_notify(&reading);

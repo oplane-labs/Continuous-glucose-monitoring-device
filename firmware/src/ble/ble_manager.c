@@ -2,12 +2,15 @@
  * @file ble_manager.c
  * @brief BLE connection and security management implementation
  *
- * Implements: SWR-042, SWR-044, SYS-REQ-031, SYS-REQ-033
+ * Implements: SWR-042, SWR-044, SWR-046, SYS-REQ-031, SYS-REQ-033
  * Risk Controls: RC-010 (AES-128-CCM encryption)
  */
 
 #include "ble_manager.h"
 #include "config/device_config.h"
+
+#include <stdio.h>
+#include <string.h>
 
 #ifndef UNIT_TEST
 #include <zephyr/bluetooth/bluetooth.h>
@@ -24,10 +27,32 @@ static struct {
     uint32_t        adv_start_time;
     ble_connect_cb_t    on_connect;
     ble_disconnect_cb_t on_disconnect;
+    char            wearer_name[CONFIG_BLE_WEARER_NAME_MAX + 1];
+    char            adv_name[CONFIG_BLE_ADV_NAME_MAX + 1];
+    uint16_t        glance_glucose;
+    glucose_trend_t glance_trend;
+    bool            glance_valid;
 } s_ble;
 
 /* Forward declarations */
 static uint32_t get_uptime_ms(void);
+static void build_adv_name(void);
+static void refresh_adv_data(void);
+
+#ifndef UNIT_TEST
+static struct bt_data s_ad[3];
+static const uint8_t s_ad_flags = BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR;
+static const uint8_t s_ad_uuid[] = { 0x1F, 0x18 }; /* CGM Service 0x181F */
+
+static void fill_adv_data(void)
+{
+    s_ad[0] = (struct bt_data)BT_DATA(BT_DATA_FLAGS, &s_ad_flags, 1);
+    s_ad[1] = (struct bt_data)BT_DATA(BT_DATA_NAME_COMPLETE,
+                                      s_ble.adv_name, strlen(s_ble.adv_name));
+    s_ad[2] = (struct bt_data)BT_DATA(BT_DATA_UUID16_ALL,
+                                      s_ad_uuid, sizeof(s_ad_uuid));
+}
+#endif
 
 /**
  * @brief Initialize BLE stack with security (SWR-042, RC-010)
@@ -53,6 +78,9 @@ cgm_error_t ble_init(void)
     s_ble.initialized = true;
     s_ble.connected = false;
     s_ble.advertising = false;
+    s_ble.wearer_name[0] = '\0';
+    s_ble.glance_valid = false;
+    build_adv_name();
 
     return CGM_OK;
 }
@@ -64,6 +92,7 @@ cgm_error_t ble_init(void)
  * - Fast interval: 1 second when no device connected
  * - Slow interval: 2 seconds after 5 minutes without connection
  * - Advertises device name and CGM Service UUID (0x181F)
+ * - Device name is personalised with wearer name and latest reading (SWR-046)
  */
 cgm_error_t ble_start_advertising(void)
 {
@@ -74,14 +103,16 @@ cgm_error_t ble_start_advertising(void)
 #ifndef UNIT_TEST
     /* Configure advertising data:
      * - Flags: LE General Discoverable, BR/EDR Not Supported
-     * - Complete Local Name: CONFIG_BLE_DEVICE_NAME
+     * - Complete Local Name: personalised name (SWR-046)
      * - 16-bit Service UUID: 0x181F (CGM Service) */
     struct bt_le_adv_param adv_param = {
+        .options      = BT_LE_ADV_OPT_CONNECTABLE,
         .interval_min = CONFIG_BLE_ADV_INTERVAL_FAST_MS * 8 / 5, /* Convert to 0.625ms units */
         .interval_max = CONFIG_BLE_ADV_INTERVAL_FAST_MS * 8 / 5,
     };
 
-    int err = bt_le_adv_start(&adv_param, NULL, 0, NULL, 0);
+    fill_adv_data();
+    int err = bt_le_adv_start(&adv_param, s_ad, ARRAY_SIZE(s_ad), NULL, 0);
     if (err) {
         return CGM_ERR_BLE_ADV_FAIL;
     }
@@ -140,6 +171,92 @@ cgm_error_t ble_disconnect(void)
 int8_t ble_get_tx_power(void)
 {
     return CONFIG_BLE_TX_POWER_DBM;
+}
+
+/* --- Personalised device name (SWR-046) --- */
+
+cgm_error_t ble_set_wearer_name(const char *name, uint16_t len)
+{
+    if (name == NULL) {
+        return CGM_ERR_BLE_NOTIFY_FAIL;
+    }
+
+    if (len > CONFIG_BLE_WEARER_NAME_MAX) {
+        len = CONFIG_BLE_WEARER_NAME_MAX;
+    }
+    memcpy(s_ble.wearer_name, name, len);
+    s_ble.wearer_name[len] = '\0';
+
+    build_adv_name();
+    refresh_adv_data();
+
+    return CGM_OK;
+}
+
+void ble_update_glance(uint16_t glucose_mgdl, glucose_trend_t trend)
+{
+    s_ble.glance_glucose = glucose_mgdl;
+    s_ble.glance_trend = trend;
+    s_ble.glance_valid = (glucose_mgdl != GLUCOSE_INVALID);
+
+    build_adv_name();
+    refresh_adv_data();
+}
+
+const char *ble_get_adv_name(void)
+{
+    return s_ble.adv_name;
+}
+
+static const char *trend_glyph(glucose_trend_t trend)
+{
+    switch (trend) {
+    case TREND_FALLING_RAPIDLY: return "vv";
+    case TREND_FALLING:         return "v";
+    case TREND_STABLE:          return "->";
+    case TREND_RISING:          return "^";
+    case TREND_RISING_RAPIDLY:  return "^^";
+    default:                    return "";
+    }
+}
+
+/**
+ * Builds the advertised name:
+ *   no wearer name, no reading  -> "GlucoSense CGM"
+ *   wearer name only            -> "Emma S"
+ *   wearer name + reading       -> "Emma S 64 v"
+ *   reading only                -> "GlucoSense CGM 64 v"
+ */
+static void build_adv_name(void)
+{
+    const char *base = (s_ble.wearer_name[0] != '\0')
+                       ? s_ble.wearer_name
+                       : CONFIG_BLE_DEVICE_NAME;
+
+    if (s_ble.glance_valid) {
+        snprintf(s_ble.adv_name, sizeof(s_ble.adv_name), "%s %u %s",
+                 base, (unsigned)s_ble.glance_glucose,
+                 trend_glyph(s_ble.glance_trend));
+    } else {
+        snprintf(s_ble.adv_name, sizeof(s_ble.adv_name), "%s", base);
+    }
+
+    /* Drop trailing space when there is no trend glyph */
+    size_t n = strlen(s_ble.adv_name);
+    if (n > 0 && s_ble.adv_name[n - 1] == ' ') {
+        s_ble.adv_name[n - 1] = '\0';
+    }
+}
+
+static void refresh_adv_data(void)
+{
+#ifndef UNIT_TEST
+    bt_set_name(s_ble.adv_name);
+    if (s_ble.advertising) {
+        fill_adv_data();
+        bt_le_adv_update_data(s_ad, ARRAY_SIZE(s_ad), NULL, 0);
+    }
+#endif
 }
 
 /* --- BLE event handlers (called from SoftDevice context) --- */
