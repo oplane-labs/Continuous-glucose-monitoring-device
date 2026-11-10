@@ -2,7 +2,7 @@
  * @file cgm_service.c
  * @brief Bluetooth SIG CGM GATT Service implementation
  *
- * Implements: SWR-040, SWR-041, SWR-043
+ * Implements: SWR-040, SWR-041, SWR-043, SWR-046
  *
  * CGM Service UUID: 0x181F
  * Characteristics:
@@ -12,10 +12,15 @@
  *   - CGM Session Start Time (0x2AAA): Read/Write
  *   - CGM Session Run Time (0x2AAB): Notify
  *   - Record Access Control Point (0x2A52): Write/Indicate
+ *
+ * GlucoSense Device Settings Service (vendor-specific):
+ *   - Wearer Name (a3c87501-...): Read/Write
  */
 
 #include "cgm_service.h"
+#include "ble_manager.h"
 #include "../storage/flash_storage.h"
+#include <stddef.h>
 #include "config/device_config.h"
 
 #ifndef UNIT_TEST
@@ -33,6 +38,12 @@
 #define BT_UUID_CGM_SESSION_START_VAL 0x2AAA
 #define BT_UUID_CGM_SESSION_RUN_VAL  0x2AAB
 #define BT_UUID_RACP_VAL             0x2A52
+
+/* GlucoSense Device Settings Service (vendor-specific, SWR-046) */
+#define BT_UUID_GS_SETTINGS_SERVICE_VAL \
+    BT_UUID_128_ENCODE(0xa3c87500, 0x8ed3, 0x4bdf, 0x8a39, 0x0a1f2b3c4d5e)
+#define BT_UUID_GS_WEARER_NAME_VAL \
+    BT_UUID_128_ENCODE(0xa3c87501, 0x8ed3, 0x4bdf, 0x8a39, 0x0a1f2b3c4d5e)
 
 /* RACP opcodes */
 #define RACP_OPCODE_REPORT_RECORDS   0x01
@@ -182,4 +193,22 @@ cgm_error_t cgm_service_update_status(const device_status_t *status)
     (void)status;
     /* Update CGM Status characteristic (0x2AA9) */
     return CGM_OK;
+}
+
+/**
+ * @brief Handle a write to the Wearer Name characteristic (SWR-046)
+ *
+ * The companion app writes the wearer's display name (UTF-8, up to
+ * CONFIG_BLE_WEARER_NAME_MAX bytes) during device setup. The name is
+ * shown in the advertised device name so the wearer can pick out their
+ * own transmitter in a list of nearby devices.
+ */
+cgm_error_t cgm_service_handle_wearer_name_write(const uint8_t *data,
+                                                 uint16_t len)
+{
+    if (!s_cgm_svc.initialized || data == NULL) {
+        return CGM_ERR_BLE_INIT_FAIL;
+    }
+
+    return ble_set_wearer_name((const char *)data, len);
 }

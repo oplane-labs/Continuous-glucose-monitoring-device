@@ -50,4 +50,26 @@ cgm_error_t ble_disconnect(void);
 /** @brief Get the current BLE TX power in dBm. */
 int8_t ble_get_tx_power(void);
 
+/**
+ * @brief Set the wearer name shown in the advertised device name (SWR-046).
+ * Names longer than CONFIG_BLE_WEARER_NAME_MAX are truncated. An empty
+ * name restores the default CONFIG_BLE_DEVICE_NAME.
+ * @param[in] name  Wearer name (not necessarily NUL-terminated).
+ * @param[in] len   Length of name in bytes.
+ */
+cgm_error_t ble_set_wearer_name(const char *name, uint16_t len);
+
+/**
+ * @brief Update the glanceable reading in the advertised name (SWR-046).
+ * Called once per measurement cycle. Produces e.g. "Emma S 64 v".
+ * @param[in] glucose_mgdl  Latest glucose value.
+ * @param[in] trend         Latest trend (glucose_trend_t).
+ */
+void ble_update_glance(uint16_t glucose_mgdl, glucose_trend_t trend);
+
+/**
+ * @brief Get the name currently being advertised.
+ */
+const char *ble_get_adv_name(void);
+
 #endif /* BLE_MANAGER_H */
